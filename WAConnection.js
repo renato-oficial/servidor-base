@@ -1,6 +1,7 @@
 const {default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, makeInMemoryStore } = require('@adiwajshing/baileys')
 const EventEmitter = require('events');
 var qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode')
 //const onMessage = require("./onMessage")
 const path = require('path')
 const P = require("pino")
@@ -27,7 +28,7 @@ class WAConnection extends EventEmitter {
 	
 	async initialize({ client }){
 
-		const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, '..', client.id))
+		const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, client.id))
 		const { version, isLatest } = await fetchLatestBaileysVersion()
 		Object.assign(client, { status: 'initializing'})
 
@@ -45,14 +46,14 @@ class WAConnection extends EventEmitter {
 		const store = makeInMemoryStore({ })
 
 		try{
-			store.readFromFile(path.join(__dirname, '..', client.id, 'store.json'))
+			store.readFromFile(path.join(__dirname, client.id, 'store.json'))
 		} catch(e){
-			fs.rmdirSync(path.join(__dirname, '..', client.id, 'store.json'))
+			fs.rmdirSync(path.join(__dirname, client.id, 'store.json'))
 		}
 
 		setInterval(() => {
 			try{
-				store.writeToFile(path.join(__dirname, '..', client.id, 'store.json'))
+				store.writeToFile(path.join(__dirname, client.id, 'store.json'))
 			} catch (e) {}
 		}, 10000)
 
@@ -63,7 +64,7 @@ class WAConnection extends EventEmitter {
 
 		this.socket.ev.on ('creds.update', saveCreds)
 
-		this.socket.ev.on('connection.update', (update) => {
+		this.socket.ev.on('connection.update', async (update) => {
 
 
 		    const { connection, lastDisconnect, qr} = update 
@@ -94,6 +95,11 @@ class WAConnection extends EventEmitter {
 		    }else if(qr){
 		    	
 		    	qrcode.generate(qr, {small: true})
+		    	if(this.qrRetry < 1){
+		    		const url = await QRCode.toDataURL(qr)
+		    		this.emit('qrCode', url)
+		    	}
+		    	
 		    }
 		    
 
